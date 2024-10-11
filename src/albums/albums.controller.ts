@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller, Delete,
   Get,
@@ -15,16 +16,26 @@ import { Album, AlbumDocument } from '../schemas/album.schema';
 import { Model } from 'mongoose';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateAlbumDto } from './create-album.dto';
+import { Track, TrackDocument } from '../schemas/track.schema';
 
 @Controller('albums')
 export class AlbumsController {
-  constructor(@InjectModel(Album.name) private albumModel: Model<AlbumDocument>) {
-  }
+  constructor(
+    @InjectModel(Album.name) private albumModel: Model<AlbumDocument>,
+    @InjectModel(Track.name) private trackModel: Model<TrackDocument>,
+  ) {}
 
   @Get()
   async getAllAlbums(@Query('artist') artist?: string) {
-    const filter = artist ? { artist: artist } : {};
-    return this.albumModel.find(filter);
+    try {
+      const filter = artist ? { artist: artist } : {};
+      return await this.albumModel.find(filter);
+    } catch (error) {
+      if (error.name === 'CastError') {
+        throw new HttpException(`${error.message}`, HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException(`${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   @Get(':id')
@@ -32,11 +43,11 @@ export class AlbumsController {
     try {
       const album = await this.albumModel.findOne({ _id: id }).populate('artist', 'name');
       if (!album) {
-        throw new NotFoundException(`Album with id ${id} not found`);
+        return new NotFoundException(`Album with id ${id} not found`);
       }
       return album;
     } catch (error) {
-      throw new HttpException(`${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new BadRequestException(`Invalid ObjectId: ${id}`);
     }
   }
 
@@ -63,8 +74,10 @@ export class AlbumsController {
     try {
       const album = await this.albumModel.findOne({ _id: id });
       if (!album) {
-        return ({ error: `Album with id ${id} not found` });
+        return new NotFoundException(`Album with id ${id} not found`);
       }
+      await this.trackModel.deleteMany({ album: id });
+
       await this.albumModel.deleteOne({ _id: id });
 
       return { message: 'Album was deleted successfully.' };
