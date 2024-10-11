@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,11 +15,14 @@ import { Artist, ArtistDocument } from '../schemas/artist.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateArtistDto } from './create-artist.dto';
+import { Album, AlbumDocument } from '../schemas/album.schema';
 
 @Controller('artists')
 export class ArtistsController {
-  constructor(@InjectModel(Artist.name) private artistModel: Model<ArtistDocument>) {
-  }
+  constructor(
+    @InjectModel(Artist.name) private artistModel: Model<ArtistDocument>,
+    @InjectModel(Album.name) private albumModel: Model<AlbumDocument>,
+  ) {}
 
   @Get()
   async getAllArtists() {
@@ -27,21 +31,34 @@ export class ArtistsController {
 
   @Get(':id')
   async getOneArtist(@Param('id') id: string) {
-    const artist = await this.artistModel.findOne({ _id: id });
-    if (!artist) {
-      throw new NotFoundException(`Artist with id ${id} not found`);
+    try {
+      const artist = await this.artistModel.findOne({ _id: id });
+      if (!artist) {
+        return new NotFoundException(`Artist with id ${id} not found`);
+      }
+      return artist;
+    } catch (error) {
+      throw new BadRequestException(`Invalid ObjectId: ${id}`);
     }
-    return artist;
+
   }
 
   @Post()
   @UseInterceptors(FileInterceptor('image', { dest: './public/images' }))
-  async create(@Body() artistData: CreateArtistDto, @UploadedFile() file: Express.Multer.File) {
-    return await this.artistModel.create({
-      name: artistData.name,
-      description: artistData.description,
-      image: file ? 'images/' + file.filename : null,
-    });
+  async createArtist(@Body() artistData: CreateArtistDto, @UploadedFile() file: Express.Multer.File) {
+    try {
+      return await this.artistModel.create({
+        name: artistData.name,
+        description: artistData.description,
+        image: file ? 'images/' + file.filename : null,
+      });
+    } catch (error) {
+      if (error.name === 'ValidationError') {
+        throw new HttpException(`${error.message}`, HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException(`Error creating artist: ${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
   }
 
   @Delete(':id')
@@ -49,17 +66,19 @@ export class ArtistsController {
     try {
       const artist = await this.artistModel.findOne({ _id: id });
       if (!artist) {
-        return ({error: `Artist with id ${id} not found`});
+        return new NotFoundException(`Artist with id ${id} not found`);
       }
+      await this.albumModel.deleteMany({ artist: id });
+
       await this.artistModel.deleteOne({ _id: id });
 
-      return { message: 'Artist was deleted successfully.'};
+      return { message: 'Artist was deleted successfully.' };
 
     } catch (error) {
-      throw new HttpException(
-        `Could not delete artist: ${error.message}`,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      if (error.name === 'CastError') {
+        throw new HttpException(`${error.message}`, HttpStatus.BAD_REQUEST);
+      }
+      throw new HttpException(`Error deleting artist: ${error.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }
