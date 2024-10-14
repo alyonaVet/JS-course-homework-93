@@ -7,7 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
-  UploadedFile,
+  UploadedFile, UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { Model } from 'mongoose';
@@ -16,6 +16,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateArtistDto } from './create-artist.dto';
 import { Album, AlbumDocument } from '../schemas/album.schema';
+import { TokenAuthGuard } from '../auth/token-auth.guard';
 
 @Controller('artists')
 export class ArtistsController {
@@ -43,6 +44,7 @@ export class ArtistsController {
 
   }
 
+  @UseGuards(TokenAuthGuard)
   @Post()
   @UseInterceptors(FileInterceptor('image', { dest: './public/images' }))
   async createArtist(@Body() artistData: CreateArtistDto, @UploadedFile() file: Express.Multer.File) {
