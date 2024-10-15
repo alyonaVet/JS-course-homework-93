@@ -1,18 +1,25 @@
 import {
-  BadRequestException, Body,
-  Controller, Delete,
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
   Get,
   HttpException,
   HttpStatus,
   NotFoundException,
-  Param, Post,
-  Query, UseGuards,
+  Param,
+  Post,
+  Query,
+  UseGuards,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Track, TrackDocument } from '../schemas/track.schema';
 import { Model } from 'mongoose';
 import { CreateTrackDto } from './create-track.dto';
 import { TokenAuthGuard } from '../auth/token-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../users/roles.decorator';
+import { Role } from '../users/role.enum';
 
 @Controller('tracks')
 export class TracksController {
@@ -63,6 +70,8 @@ export class TracksController {
     }
   }
 
+  @UseGuards(TokenAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @Delete(':id')
   async deleteTrack(@Param('id') id: string) {
     try {

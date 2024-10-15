@@ -18,13 +18,17 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateAlbumDto } from './create-album.dto';
 import { Track, TrackDocument } from '../schemas/track.schema';
 import { TokenAuthGuard } from '../auth/token-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../users/roles.decorator';
+import { Role } from '../users/role.enum';
 
 @Controller('albums')
 export class AlbumsController {
   constructor(
     @InjectModel(Album.name) private albumModel: Model<AlbumDocument>,
     @InjectModel(Track.name) private trackModel: Model<TrackDocument>,
-  ) {}
+  ) {
+  }
 
   @Get()
   async getAllAlbums(@Query('artist') artist?: string) {
@@ -71,6 +75,8 @@ export class AlbumsController {
     }
   }
 
+  @UseGuards(TokenAuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @Delete(':id')
   async deleteAlbum(@Param('id') id: string) {
     try {
