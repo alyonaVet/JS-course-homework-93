@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, Post, Req, UseGuards } from '@nestjs/common';
 import { User, UserDocument } from '../schemas/user.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
@@ -14,15 +14,22 @@ export class UsersController {
 
   @Post()
   async registerUser(@Body() userData: CreateUserDto) {
-    const user = new this.userModel({
-      username: userData.username,
-      password: userData.password,
-      displayName: userData.displayName,
-    });
+    try {
+      const user = new this.userModel({
+        username: userData.username,
+        password: userData.password,
+        displayName: userData.displayName,
+      });
 
-    user.generateToken();
+      user.generateToken();
 
-    return await user.save();
+      return await user.save();
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new ConflictException('Username already exists');
+      }
+      throw error;
+    }
   }
 
   @UseGuards(AuthGuard('local'))
