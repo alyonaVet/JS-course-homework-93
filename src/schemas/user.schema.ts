@@ -33,11 +33,12 @@ export class User {
   displayName: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: Role,
     default: Role.User,
   })
-  role: string;
+  role: Role;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
